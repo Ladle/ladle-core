@@ -131,19 +131,17 @@ impl<T> State<T>
 
     fn check_node(&mut self, node_idx: NodeIdx) {
         let base_node = self.get_node(node_idx);
+        let leftmost = base_node.start;
+        let rightmost = base_node.stop;
 
         if let Some(rule_indices) = self.rule_map.get(&base_node.label) {
             for rule_idx in rule_indices {
-                let rule = self.get_rule(*rule_idx);
-                let has_next = rule.successors.len() != 0;
-
                 self.check_queue.push_back(Check {
                     rule_idx: *rule_idx,
                     stage: CheckStage::StartRight,
 
                     pos: 0,
-                    leftmost: base_node.start,
-                    rightmost: base_node.stop,
+                    leftmost, rightmost,
 
                     base: node_idx,
                     right_nodes: Vec::new(),
@@ -172,9 +170,10 @@ impl<T> State<T>
 
     fn check_right(&mut self, check: Check) {
         let rule = self.get_rule(check.rule_idx);
+        let rule_suc_len = rule.successors.len();
         let expected = rule.successors[check.pos];
         
-        for suc_idx in self.get_table_entry(check.rightmost).started.iter() {
+        for suc_idx in self.get_table_entry(check.rightmost).started.clone().iter() {
             // Check whether the found label matches the expected one
             if self.get_node(*suc_idx).label == expected {
                 let new_left_nodes = check.left_nodes.clone();
@@ -182,7 +181,7 @@ impl<T> State<T>
                 new_right_nodes.push(*suc_idx);
 
                 // Check whether the right-check is done
-                if check.pos + 1 == rule.successors.len() {
+                if check.pos + 1 == rule_suc_len {
                     // If the right-check is done, create a left-check
                     self.check_queue.push_back(Check {
                         rule_idx: check.rule_idx,
@@ -236,11 +235,12 @@ impl<T> State<T>
 
     fn check_left(&mut self, check: Check) {
         let rule = self.get_rule(check.rule_idx);
-        let rule_pred_len = rule.predecessors.len();
 
+        let rule_pred_len = rule.predecessors.len();
+        let result = rule.result;
         let expected = rule.predecessors[check.pos];
         
-        for suc_idx in self.get_table_entry(check.rightmost).terminated.iter() {
+        for suc_idx in self.get_table_entry(check.rightmost).terminated.clone().iter() {
             if self.get_node(*suc_idx).label == expected {
                 let mut new_left_nodes = check.left_nodes.clone();
                 let new_right_nodes = check.right_nodes.clone();
@@ -249,7 +249,7 @@ impl<T> State<T>
                 if check.pos + 1 == rule_pred_len {
                     // reverse iterate the left_nodes, then iterate the right_nodes, then deref, then make a vector
                     let children = check.left_nodes.iter().rev().chain(check.right_nodes.iter()).map(|a| *a).collect();
-                    self.add_non_terminal(rule.result, check.leftmost, check.rightmost, check.rule_idx, children);
+                    self.add_non_terminal(result, check.leftmost, check.rightmost, check.rule_idx, children);
                 } else {
                     if let Some(next_leftmost) = self.prev_table_idx(check.leftmost) {
                         self.check_queue.push_back(Check {
