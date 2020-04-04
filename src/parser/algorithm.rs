@@ -25,7 +25,9 @@ pub struct State<T>
     /// The table of reference-points into the input
     table: Vec<TableEntry>,
     nodes: Vec<Node<T>>,
-    tasks: VecDeque<Task>
+
+    node_queue: VecDeque<NodeIdx>,
+    check_queue: VecDeque<Check>
 }
 
 #[derive(Debug, Clone)]
@@ -62,11 +64,13 @@ impl<T> State<T>
         // allocate table with exact size that will be needed
         let table = vec![TableEntry::new(); tokens.len() + 1];
         // allocate nodes with twice as much room as minimally needed
-        let nodes = Vec::with_capacity(tokens.len() * 2); 
+        let nodes = Vec::with_capacity(tokens.len() * 2);
         // allocate queue with twice as much room as minimally needed
-        let queue = VecDeque::with_capacity(tokens.len() * 2);
+        let node_queue = VecDeque::with_capacity(tokens.len() * 2);
+        // allocate queue for the checks
+        let check_queue = VecDeque::with_capacity(tokens.len());
 
-        let mut state = State { rules, rule_map, table, nodes, queue };
+        let mut state = State { rules, rule_map, table, nodes, node_queue, check_queue };
 
         for (i, token) in tokens.iter().enumerate() {
             let node_idx = state.add_terminal(*token, i);
@@ -74,7 +78,7 @@ impl<T> State<T>
             // Only queue nodes which are part of rules containing only terminals
             // Initially these are the only nodes that can produce yield results anyway
             // All nodes that become usable can be reached by enqueuing produced nodes as normal
-            state.queue.push_back(node_idx);
+            state.node_queue.push_back(node_idx);
         }
 
         state
@@ -99,24 +103,33 @@ impl<T> State<T>
 
         return node_idx;
     }
+    
+    pub fn done(&self) -> bool {
+        self.node_queue.is_empty()
+    }
 
-    pub fn run(&mut self) {
-        while let Some(next_task) = self.tasks.pop_front() {
-            match next_task {
-                Task::NodeCheck { node } => {
-                    self.node_check(node);
-                },
-                Task::RightCheck { rule_idx, right_pos, leftmost, rightmost } => {
-                    self.right_check(rule_idx, right_pos, leftmost, rightmost);
-                },
-                Task::LeftCheck { rule_idx, left_pos, leftmost, rightmost } => {
-                    self.left_check(rule_idx, left_pos, leftmost, rightmost);
-                }
+    pub fn run_till_done(&mut self) {
+        while !self.done() {
+            self.run_cycle();
+        }
+    }
+
+    pub fn run_cycle(&mut self) {
+        while let Some(node_idx) = self.node_queue.pop_front() {
+            self.check_node(node_idx)
+        }
+
+        while let Some(check) = self.check_queue.pop_front() {
+            match check.stage {
+                CheckStage::StartRight => self.check_start_right(check),
+                CheckStage::Right => self.check_right(check),
+                CheckStage::StartLeft => self.check_start_left(check),
+                CheckStage::Left => self.check_left(check)
             }
         }
     }
 
-    fn node_check(&mut self, node_idx: NodeIdx) {
+    fn check_node(&mut self, node_idx: NodeIdx) {
         let base_node = self.get_node(node_idx);
 
         if let Some(rule_indices) = self.rule_map.get(&base_node.label) {
@@ -124,150 +137,132 @@ impl<T> State<T>
                 let rule = self.get_rule(*rule_idx);
                 let has_next = rule.successors.len() != 0;
 
-                self.tasks.push_back(Task::RightCheck {
+                self.check_queue.push_back(Check {
                     rule_idx: *rule_idx,
-                    right_pos: 0,
+                    stage: CheckStage::StartRight,
+
+                    pos: 0,
                     leftmost: base_node.start,
-                    rightmost: base_node.stop
+                    rightmost: base_node.stop,
+
+                    base: node_idx,
+                    right_nodes: Vec::new(),
+                    left_nodes: Vec::new()
                 });
             }
         }
 
     }
 
-    fn right_check(&mut self,
-            rule_idx: RuleIdx, right_pos: usize,
-            leftmost: TableIdx, rightmost: TableIdx) {
+    fn check_start_right(&mut self, mut check: Check) {
+        let rule = self.get_rule(check.rule_idx);
+        
+        if rule.successors.is_empty() {
+            check.stage = CheckStage::StartLeft;
+            self.check_queue.push_back(check);
+        } else {
+            if let Some(next_idx) = self.next_table_idx(check.rightmost) {
+                check.stage = CheckStage::Right;
+                check.rightmost = next_idx;
+                self.check_queue.push_back(check);
+            }
+        }
+    }
 
-        let rule = self.get_rule(rule_idx);
 
-        if right_pos == 0 {
-            if rule.successors.is_empty() {
-                self.tasks.push_back(Task::LeftCheck {
-                    rule_idx,
-                    left_pos: 0,
-                    leftmost, rightmost 
-                });
-            } else {
-                if let Some() = {
-                    self.tasks.push_back(Task::RightCheck {
-                        rule_idx,
-                        right_pos: 1,
-                        leftmost,
-                        rightmost:  
+    fn check_right(&mut self, check: Check) {
+        let rule = self.get_rule(check.rule_idx);
+        let expected = rule.successors[check.pos];
+        
+        for suc_idx in self.get_table_entry(check.rightmost).started.iter() {
+            // Check whether the found label matches the expected one
+            if self.get_node(*suc_idx).label == expected {
+                let new_left_nodes = check.left_nodes.clone();
+                let mut new_right_nodes = check.right_nodes.clone();
+                new_right_nodes.push(*suc_idx);
+
+                // Check whether the right-check is done
+                if check.pos + 1 == rule.successors.len() {
+                    // If the right-check is done, create a left-check
+                    self.check_queue.push_back(Check {
+                        rule_idx: check.rule_idx,
+                        stage: CheckStage::StartLeft,
+
+                        pos: 0,
+                        leftmost: check.leftmost,
+                        rightmost: check.rightmost,
+
+                        base: check.base,
+                        left_nodes: new_left_nodes,
+                        right_nodes: new_right_nodes
                     });
-                }
-            }
-        } else {
+                } else {
+                    // Increment idx, only proceeding if we don't overrun the table
+                    if let Some(next_rightmost) = self.next_table_idx(check.rightmost) {
+                        self.check_queue.push_back(Check {
+                            rule_idx: check.rule_idx,
+                            stage: CheckStage::Right,
 
-        }
-    }
+                            pos: check.pos + 1,
+                            leftmost: check.leftmost,
+                            rightmost: next_rightmost,
 
-    fn left_check(&mut self,
-            rule_idx: RuleIdx, left_pos: usize,
-            leftmost: TableIdx, rightmost: TableIdx) {
-
-        if left_pos == 0 {
-
-        } else {
-            
-        }
-    }
-
-    pub fn check_node(&mut self, base_idx: NodeIdx) {
-        let base_node = self.get_node(base_idx);
-
-        let (mut right_checks, mut left_checks) = self.build_checks(base_node);
-        self.perform_right_checks(base_node, &mut right_checks, &mut left_checks);
-        self.perform_left_checks(base_node, &mut left_checks);
-    }
-
-    // For a given label
-    fn build_checks(&self, base_node: &Node<T>) -> (VecDeque<RightCheck>, VecDeque<LeftCheck>) {
-        let table_next = self.next_table_idx(base_node.stop);
-        let table_prev = self.prev_table_idx(base_node.start);
-
-        if let Some(rule_indices) = self.rule_map.get(&base_node.label) {
-            for rule_idx in rule_indices {
-                let rule = self.get_rule(*rule_idx);
-                let has_next = rule.successors.len() != 0;
-                let has_prev = rule.predecessors.len() != 0;
-
-                match (has_next, table_next, has_prev, table_prev) {
-                    (true, Some(table_n), _, _) => {
-                        right_checks.push_back(RightCheck {
-                            rule_idx: *rule_idx,
-                            rule_pos: 0,
-                            table_pos: table_n
-                        })
-                    },
-                    (_, _, true, Some(table_p)) => {
-                        left_checks.push_back(LeftCheck {
-                            rule_idx: *rule_idx,
-                            rightmost_extent: base_node.stop,
-                            rule_pos: 0,
-                            table_pos: table_p
-                        })
-                    },
-                    _ => {}
-                }
-            }
-        }
-
-        return (right_checks, left_checks);
-    }
-
-    fn perform_right_checks(&self, base_node: &Node<T>,
-                right_checks: &mut VecDeque<RightCheck>,
-                left_checks: &mut VecDeque<LeftCheck>) {
-
-        while let Some(next_check) = right_checks.pop_front() {
-            let current_rule = self.get_rule(next_check.rule_idx);
-            let expected = current_rule.successors[next_check.rule_pos];
-            
-            for suc_idx in self.get_table_entry(next_check.table_pos).started.iter() {
-                // Check whether the found label matches the expected one
-                if self.get_node(*suc_idx).label == expected {
-                    // Check whether the right-check is done
-                    if next_check.rule_pos + 1 == current_rule.successors.len() {
-                        // If the right-check is done, create a left-check
-                        left_checks.push_back(LeftCheck {
-                            rule_idx: next_check.rule_idx,
-                            rightmost_extent: next_check.table_pos,
-                            rule_pos: 0,
-                            table_pos: 1,
+                            base: check.base,
+                            left_nodes: new_left_nodes,
+                            right_nodes: new_right_nodes
                         });
-                    } else {
-                        // Increment idx and fail if we would overrun the table
-                        if let Some(next_table_idx) = self.next_table_idx(next_check.table_pos) {
-                            right_checks.push_back(RightCheck {
-                                rule_idx: next_check.rule_idx,
-                                rule_pos: next_check.rule_pos + 1,
-                                table_pos: next_table_idx,
-                            });
-                        }
                     }
                 }
             }
         }
     }
 
-    fn perform_left_checks(&mut self, left_checks: &mut VecDeque<LeftCheck>) {
-        while let Some(next_check) = left_checks.pop_front() {
-            let current_rule = self.get_rule(next_check.rule_idx);
 
-            let expected = current_rule.successors[next_check.rule_pos];
-            
-            for suc_idx in self.get_table_entry(next_check.table_pos).terminated.iter() {
-                if self.get_node(*suc_idx).label == expected {
-                    if next_check.rule_pos + 1 == current_rule.predecessors.len() {
-                        // matched
-                    } else {
-                        left_checks.push_back(LeftCheck {
-                            rule_idx: next_check.rule_idx,
-                            rightmost_extent: next_check.rightmost_extent,
-                            rule_pos: next_check.rule_pos + 1,
-                            table_pos: TableIdx(next_check.table_pos.0 - 1),
+    fn check_start_left(&mut self, mut check: Check) {
+        let rule = self.get_rule(check.rule_idx);
+
+        if rule.predecessors.is_empty() {
+            // reverse iterate the left_nodes, then iterate the right_nodes, then deref, then make a vector
+            self.add_non_terminal(rule.result, check.leftmost, check.rightmost, check.rule_idx, check.right_nodes);
+        } else {
+            if let Some(next_idx) = self.next_table_idx(check.rightmost) {
+                check.stage = CheckStage::Right;
+                check.rightmost = next_idx;
+                self.check_queue.push_back(check);
+            }
+        }
+    }
+
+
+    fn check_left(&mut self, check: Check) {
+        let rule = self.get_rule(check.rule_idx);
+        let rule_pred_len = rule.predecessors.len();
+
+        let expected = rule.predecessors[check.pos];
+        
+        for suc_idx in self.get_table_entry(check.rightmost).terminated.iter() {
+            if self.get_node(*suc_idx).label == expected {
+                let mut new_left_nodes = check.left_nodes.clone();
+                let new_right_nodes = check.right_nodes.clone();
+                new_left_nodes.push(*suc_idx);
+
+                if check.pos + 1 == rule_pred_len {
+                    // reverse iterate the left_nodes, then iterate the right_nodes, then deref, then make a vector
+                    let children = check.left_nodes.iter().rev().chain(check.right_nodes.iter()).map(|a| *a).collect();
+                    self.add_non_terminal(rule.result, check.leftmost, check.rightmost, check.rule_idx, children);
+                } else {
+                    if let Some(next_leftmost) = self.prev_table_idx(check.leftmost) {
+                        self.check_queue.push_back(Check {
+                            rule_idx: check.rule_idx,
+                            stage: CheckStage::Left,
+
+                            pos: check.pos + 1,
+                            leftmost: next_leftmost,
+                            rightmost: check.rightmost,
+
+                            base: check.base,
+                            left_nodes: new_left_nodes,
+                            right_nodes: new_right_nodes
                         });
                     }
                 }
@@ -296,17 +291,10 @@ impl<T> State<T>
         return node_idx;
     }
 
-    pub fn run_till_done(&mut self) {
-        while let Some(next_check) = self.queue.pop_front() {
-            self.check_node(next_check);
-        }
-    }
-
     pub fn get_parsed_trees() {
-
+        // TODO
     }
 
-    
     #[inline]
     fn get_node(&self, idx: NodeIdx) -> &Node<T> {
         &self.nodes[idx.0]
@@ -342,34 +330,26 @@ impl<T> State<T>
     }
 }
 
-enum Task {
-    NodeCheck {
-        node: NodeIdx
-    },
+#[derive(Debug, Clone)]
+struct Check {
+    /// The current rule being examined
+    rule_idx: RuleIdx,
 
-    RightCheck {
-        /// The current rule being examined
-        rule_idx: RuleIdx,
-        ///
-        right_pos: usize,
-        
-        leftmost: TableIdx,
-        rightmost: TableIdx
-    },
+    stage: CheckStage,
+    ///
+    pos: usize,
+    
+    leftmost: TableIdx,
+    rightmost: TableIdx,
 
-    LeftCheck {
-        /// The current rule being examined
-        rule_idx: RuleIdx,
-        /// The index of the next expected token in the predecessor list
-        left_pos: usize,
-
-        leftmost: TableIdx,
-        rightmost: TableIdx
-    }
+    base: NodeIdx,
+    right_nodes: Vec<NodeIdx>,
+    left_nodes: Vec<NodeIdx>
 }
 
+#[derive(Debug, Clone)]
 enum CheckStage {
-    Init, Right, Left, Done
+    StartRight, Right, StartLeft, Left
 }
 
 impl TableEntry {
