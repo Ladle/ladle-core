@@ -149,11 +149,14 @@ impl<T> State<T>
                     leftmost, rightmost 
                 });
             } else {
-                self.tasks.push_back(Task::RightCheck {
-                    rule_idx,
-                    left_pos: 1,
-                    leftmost, rightmost 
-                });
+                if let Some() = {
+                    self.tasks.push_back(Task::RightCheck {
+                        rule_idx,
+                        right_pos: 1,
+                        leftmost,
+                        rightmost:  
+                    });
+                }
             }
         } else {
 
