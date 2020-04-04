@@ -219,10 +219,11 @@ impl<T> State<T>
 
     fn check_start_left(&mut self, mut check: Check) {
         let rule = self.get_rule(check.rule_idx);
+        let result = rule.result;
 
         if rule.predecessors.is_empty() {
             // reverse iterate the left_nodes, then iterate the right_nodes, then deref, then make a vector
-            self.add_non_terminal(rule.result, check.leftmost, check.rightmost, check.rule_idx, check.right_nodes);
+            self.add_non_terminal(result, check.leftmost, check.rightmost, check.rule_idx, check.right_nodes);
         } else {
             if let Some(next_idx) = self.next_table_idx(check.rightmost) {
                 check.stage = CheckStage::Right;
