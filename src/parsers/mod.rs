@@ -1,6 +1,5 @@
 mod lr;
 mod glr;
-mod experimental;
 
 pub struct CFG {
     /// Each index in the outer table represents a non-terminal
@@ -23,9 +22,9 @@ pub enum Symbol {
     NonTerminal { val: NonTerm }
 }
 
-#[derive(Debug, Clone, Copy, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Term(usize);
-#[derive(Debug, Clone, Copy, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NonTerm(usize);
 
 use std::cmp::max;

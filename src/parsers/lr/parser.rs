@@ -1,6 +1,6 @@
 use crate::parsers::{ Term, NonTerm };
 
-#[derive(Debug, Clone, Copy, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct State(usize);
 
 struct LRParser {
