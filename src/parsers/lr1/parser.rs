@@ -6,7 +6,7 @@ use super::tables::{ LRTables };
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct State(usize);
 
-struct LRParser {
+pub struct LRParser {
     // The Parse action and state transition tables
     tables: LRTables,
 
@@ -22,5 +22,33 @@ struct LRParser {
 }
 
 impl LRParser {
+    pub fn new(tables: LRTables, input: Vec<Term>) -> Self {
+        LRParser {
+            tables,
+            input,
+            input_index: 0,
+            state_stack: Vec::new(),
+            forest: Vec::new()
+        }
+    }
 
+    pub fn done(&self) -> bool {
+        self.input_index == self.input.len()
+    }
+
+    pub fn execute(&mut self) {
+
+    }
+
+    pub fn execute_step(&mut self) {
+
+    }
+
+    pub fn to_output(mut self) -> Option<BoxTree> {
+        if self.done() && self.forest.len() == 1 {
+            Some(self.forest.remove(0))
+        } else {
+            None
+        }
+    }
 }
