@@ -1,6 +1,5 @@
 mod input;
-mod parser;
-mod tokenizer;
+mod parsers;
 
 #[cfg(test)]
 mod tests {
