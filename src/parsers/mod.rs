@@ -1,5 +1,6 @@
 mod lr;
 mod glr;
+mod experimental;
 
 pub struct CFG {
     /// Each index in the outer table represents a non-terminal
