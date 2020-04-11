@@ -1,4 +1,4 @@
-mod lr;
+mod lr1;
 mod glr;
 
 pub struct CFG {
