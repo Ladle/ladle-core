@@ -1,10 +1,8 @@
 use crate::parsers::{ Term, NonTerm };
 use crate::parsers::trees::BoxTree;
 
-use super::tables::{ LRTables };
+use super::tables::{ LRTables, State };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct State(usize);
 
 pub struct LRParser {
     // The Parse action and state transition tables
@@ -22,6 +20,9 @@ pub struct LRParser {
 }
 
 impl LRParser {
+    /// Create an LRParser
+    /// with a set of LRTables that represent the grammar logic
+    /// and a list of input terminals to parse
     pub fn new(tables: LRTables, input: Vec<Term>) -> Self {
         LRParser {
             tables,
@@ -32,18 +33,22 @@ impl LRParser {
         }
     }
 
+    /// Is the LRParser finished parsing
     pub fn done(&self) -> bool {
         self.input_index == self.input.len()
     }
 
+    /// Execute the parser until completion
     pub fn execute(&mut self) {
 
     }
 
+    /// Execute one step of the parser
     pub fn execute_step(&mut self) {
 
     }
 
+    /// Extract the output from the parser
     pub fn to_output(mut self) -> Option<BoxTree> {
         if self.done() && self.forest.len() == 1 {
             Some(self.forest.remove(0))

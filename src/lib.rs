@@ -1,5 +1,5 @@
-mod input;
-mod parsers;
+pub mod input;
+pub mod parsers;
 
 #[cfg(test)]
 mod tests {

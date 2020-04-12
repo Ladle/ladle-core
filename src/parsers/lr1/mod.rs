@@ -1,5 +1,5 @@
-mod parser;
-mod tables;
+pub mod parser;
+pub mod tables;
 
 use super::{ CFG, Term };
 use super::trees::BoxTree;
