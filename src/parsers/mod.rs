@@ -1,9 +1,9 @@
 pub mod lr1;
 pub mod glr;
-pub mod trees;
 
-/// The type 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A Context Free Grammar,
+/// logically it is a set of productions.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CFG {
     /// Each index in the outer table represents a non-terminal
     /// The value of that cell is the list of productions
@@ -11,8 +11,10 @@ pub struct CFG {
     indexed_rules: Vec<Vec<CFGProduction>>
 }
 
-/// 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A production in a context free grammar.
+/// Each production asserts that the right symbols
+/// can be produced from the left non-terminal.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CFGProduction {
     /// The non-terminal symbol's index
     pub left: NonTerm,
@@ -20,19 +22,19 @@ pub struct CFGProduction {
     pub right: Vec<Symbol>
 }
 
-/// 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A symbol, either terminal or non-terminal
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Symbol {
     Terminal { val: Term },
     NonTerminal { val: NonTerm }
 }
 
-/// 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A terminal symbol in a grammar
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Term(usize);
 
-/// 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A non-terminal symbol in a grammar
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NonTerm(usize);
 
 use std::cmp::max;

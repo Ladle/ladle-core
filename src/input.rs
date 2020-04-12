@@ -386,19 +386,19 @@ mod tests {
         }
         for i in 5..6 {
             assert_eq!(1, input.get_row_num(i));
-            assert_eq!(Pos { row: 1, col: i - 4 }, input.get_pos(i));
+            assert_eq!(Pos { row: 1, col: i - 5 }, input.get_pos(i), "index is {}", i);
         }
         for i in 7..8 {
             assert_eq!(2, input.get_row_num(i));
-            assert_eq!(Pos { row: 2, col: i - 6 }, input.get_pos(i));
+            assert_eq!(Pos { row: 2, col: i - 7 }, input.get_pos(i));
         }
         for i in 9..14 {
             assert_eq!(3, input.get_row_num(i));
-            assert_eq!(Pos { row: 3, col: i - 8 }, input.get_pos(i));
+            assert_eq!(Pos { row: 3, col: i - 9 }, input.get_pos(i));
         }
         for i in 15..18 {
             assert_eq!(3, input.get_row_num(i));
-            assert_eq!(Pos { row: 3, col: i - 14 }, input.get_pos(i));
+            assert_eq!(Pos { row: 3, col: i - 15 }, input.get_pos(i));
         }
         println!("{:?}", input.newline_table);
         println!("{}", input.get_span(2, 17, "DF-G"));

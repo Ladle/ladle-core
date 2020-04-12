@@ -1,4 +1,5 @@
 pub mod input;
+pub mod trees;
 pub mod parsers;
 
 #[cfg(test)]
