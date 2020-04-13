@@ -59,17 +59,31 @@ impl<'a, T> LRParser<'a, T>
 
     /// Execute one step of the parser
     pub fn execute_step(&mut self) {
-        let top_state = *self.state_stack.last().unwrap();
-
-        if self.input_index == self.input.len() {
-            self.execute_end_action(top_state);
-        } else {
-            self.execute_action(top_state);
+        if self.failed {
+            return;
         }
 
-        let right_most = root_as_symbol(self.forest.last().unwrap());
-        let next_state = self.transition.get_state(top_state, right_most);
-        self.state_stack.push(next_state);
+        if let Some(top_state) = self.state_stack.last() {
+            let top_state = *top_state;
+
+            if self.input_index == self.input.len() {
+                self.execute_end_action(top_state);
+            } else {
+                self.execute_action(top_state);
+            }
+
+            let right_most = root_as_symbol(self.forest.last().unwrap());
+
+            if let Some(next_state) = self.transition.get_state(top_state, right_most) {
+                self.state_stack.push(next_state);
+            } else {
+                self.failed = true;
+                return;
+            }
+        } else {
+            self.failed = true;
+            return;
+        }        
     }
 
     fn execute_end_action(&mut self, top_state: T::State) {
@@ -111,6 +125,7 @@ impl<'a, T> LRParser<'a, T>
 
         for _i in 0..nodes {
             let tree = self.forest.pop().unwrap();
+            let _state = self.state_stack.pop();
             children.push(tree);
         }
 

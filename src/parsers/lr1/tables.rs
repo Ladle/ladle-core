@@ -21,7 +21,7 @@ pub trait LRTransition {
     
     /// Get the next state based on the current state and the symbol
     /// at the root of the right most tree
-    fn get_state(&self, state: Self::State, right_most: Symbol) -> Self::State;
+    fn get_state(&self, state: Self::State, right_most: Symbol) -> Option<Self::State>;
 }
 
 /// A simple LRTransition that stores its data in
@@ -38,9 +38,15 @@ pub struct SimpleTransition {
     /// The indices of this Vec represent state.
     end_actions: Vec<EndParseAction>,
 
-    ///
-    non_terminal_states: Vec<Vec<SimpleState>>,
-    terminal_states: Vec<Vec<SimpleState>>
+    /// The state transition tables for non-terminals.
+    /// The first level of indices represents state.
+    /// The second level of indices represents the root non-terminal.
+    non_terminal_states: Vec<Vec<Option<SimpleState>>>,
+
+    /// The state transition tables for terminals
+    /// The first level of indices represents state.
+    /// The second level of indices represents the root terminal.
+    terminal_states: Vec<Vec<Option<SimpleState>>>
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -64,7 +70,7 @@ impl LRTransition for SimpleTransition {
         self.end_actions[index]
     }
 
-    fn get_state(&self, state: SimpleState, right_most: Symbol) -> SimpleState {
+    fn get_state(&self, state: SimpleState, right_most: Symbol) -> Option<SimpleState> {
         let index_outer = state.0;
         match right_most {
             Symbol::Terminal { val } => {
