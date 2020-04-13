@@ -23,8 +23,10 @@ pub struct LRParser<'a, T>
     state_stack: Vec<T::State>,
     /// The list of current trees
     forest: Vec<BoxTree<NonTerm, Term>>,
-    /// The parse error found, if one was
-    failed: bool
+    /// Whether the parser has failed
+    failed: bool,
+    /// Whether the parser has finished
+    finished: bool
 }
 
 impl<'a, T> LRParser<'a, T>
@@ -41,25 +43,21 @@ impl<'a, T> LRParser<'a, T>
             input_index: 0,
             state_stack: vec![T::initial_state()],
             forest: Vec::new(),
-            failed: false
+            failed: false,
+            finished: false
         }
-    }
-
-    /// Is the LRParser finished parsing
-    pub fn done(&self) -> bool {
-        self.input_index == self.input.len() && self.forest.len() == 1
     }
 
     /// Execute the parser until completion
     pub fn execute(&mut self) {
-        while !self.done() && !self.failed {
+        while !self.finished && !self.failed {
             self.execute_step();
         }
     }
 
     /// Execute one step of the parser
     pub fn execute_step(&mut self) {
-        if self.failed {
+        if self.failed || self.finished {
             return;
         }
 
@@ -90,6 +88,10 @@ impl<'a, T> LRParser<'a, T>
         let end_action = self.transition.get_action_end(top_state);
 
         match end_action {
+            EndParseAction::Accept => {
+                self.finished = true;
+                return;
+            }
             EndParseAction::Error => {
                 self.failed = true;
                 return
@@ -107,6 +109,10 @@ impl<'a, T> LRParser<'a, T>
         let action = self.transition.get_action(top_state, next_input);
 
         match action {
+            ParseAction::Accept => {
+                self.finished = true;
+                return;
+            },
             ParseAction::Error => {
                 self.failed = true;
                 return
@@ -135,9 +141,18 @@ impl<'a, T> LRParser<'a, T>
         self.forest.push(new_tree);
     }
 
+    /// Is the LRParser finished parsing
+    pub fn finished(&self) -> bool {
+        self.finished
+    }
+
+    pub fn failed(&self) -> bool {
+        self.failed
+    }
+
     /// Extract the output from the parser
     pub fn to_output(mut self) -> Option<BoxTree<NonTerm, Term>> {
-        if self.done() && !self.failed {
+        if self.finished && !self.failed {
             Some(self.forest.remove(0))
         } else {
             None

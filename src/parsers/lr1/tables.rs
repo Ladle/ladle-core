@@ -95,18 +95,24 @@ impl From<CFG> for SimpleTransition {
 /// at a given step of the parse algorithm
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ParseAction {
-    /// Error Action
-    /// The parser fails and emits an error
+    /// Accept Action.
+    /// The parser accepts the input,
+    /// and indicates that the tree in the forest
+    /// represents the entire input.
+    Accept,
+
+    /// Error Action.
+    /// The parser fails and emits an error.
     Error,
 
-    /// Shift Action
+    /// Shift Action.
     /// The parser takes the next input in
-    /// and creates a tree in the forest for it 
+    /// and creates a tree in the forest for it.
     Shift,
 
-    /// Reduce Action
+    /// Reduce Action.
     /// Combine the last nodes trees in the tree table
-    /// into a single tree labeled `nonterm`
+    /// into a single tree labeled `nonterm`.
     Reduce {
         /// The non-terminal to label the new tree with
         nonterm: NonTerm,
@@ -119,6 +125,12 @@ pub enum ParseAction {
 /// at a given step of the parse algorithm
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EndParseAction {
+    /// Accept Action.
+    /// The parser accepts the input,
+    /// and indicates that the tree in the forest
+    /// represents the entire input.
+    Accept,
+
     /// Error Action
     /// The parser fails and emits an error
     Error,
