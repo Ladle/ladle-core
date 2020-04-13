@@ -69,18 +69,8 @@ impl<'a, T> LRParser<'a, T>
             } else {
                 self.execute_action(top_state);
             }
-
-            let right_most = root_as_symbol(self.forest.last().unwrap());
-
-            if let Some(next_state) = self.transition.get_state(top_state, right_most) {
-                self.state_stack.push(next_state);
-            } else {
-                self.failed = true;
-                return;
-            }
         } else {
             self.failed = true;
-            return;
         }        
     }
 
@@ -90,11 +80,9 @@ impl<'a, T> LRParser<'a, T>
         match end_action {
             EndParseAction::Accept => {
                 self.finished = true;
-                return;
             }
             EndParseAction::Error => {
                 self.failed = true;
-                return
             },
             EndParseAction::Reduce { nonterm, nodes } => {
                 self.reduce(nonterm, nodes);
@@ -104,26 +92,29 @@ impl<'a, T> LRParser<'a, T>
 
     fn execute_action(&mut self, top_state: T::State) {
         let next_input = self.input[self.input_index];
-        self.input_index += 1;
 
         let action = self.transition.get_action(top_state, next_input);
 
         match action {
             ParseAction::Accept => {
                 self.finished = true;
-                return;
             },
             ParseAction::Error => {
                 self.failed = true;
-                return
             },
             ParseAction::Shift => {
-                self.forest.push(BoxTree::new_leaf(next_input));
+                self.shift(next_input);
             },
             ParseAction::Reduce { nonterm, nodes } => {
                 self.reduce(nonterm, nodes);
             }
         }
+    }
+
+    fn shift(&mut self, next_input: Term) {
+        self.forest.push(BoxTree::new_leaf(next_input));
+        self.input_index += 1;
+        self.push_state();
     }
 
     fn reduce(&mut self, nonterm: NonTerm, nodes: usize) {
@@ -139,6 +130,15 @@ impl<'a, T> LRParser<'a, T>
         let new_tree = BoxTree::new_branch(nonterm, children);
 
         self.forest.push(new_tree);
+
+        self.push_state();
+    }
+
+    fn push_state(&mut self) {
+        let right_most = root_as_symbol(self.forest.last().unwrap());
+        let top_state = *self.state_stack.last().unwrap();
+        let next_state = self.transition.get_state(top_state, right_most).unwrap();
+        self.state_stack.push(next_state);
     }
 
     /// Is the LRParser finished parsing

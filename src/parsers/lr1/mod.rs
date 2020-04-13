@@ -8,13 +8,15 @@ use super::{ CFG, NonTerm, Term };
 use crate::trees::BoxTree;
 
 use parser::LRParser;
-use tables::SimpleTransition;
+use tables::simple::SimpleTransition;
+
+use std::convert::TryFrom;
 
 /// Use a Context Free Grammar to parse a string of Terminals
 /// and create a Parse Tree
-pub fn parse(cfg: CFG, input: Vec<Term>) -> Option<BoxTree<NonTerm, Term>> {
-    let tables: &SimpleTransition = &cfg.into();
-    let mut parser = LRParser::new(tables, input);
+pub fn parse_simple(cfg: CFG, input: Vec<Term>) -> Option<BoxTree<NonTerm, Term>> {
+    let tables: SimpleTransition = SimpleTransition::try_from(cfg).ok()?;
+    let mut parser = LRParser::new(&tables, input);
     parser.execute();
     parser.to_output()
 }
