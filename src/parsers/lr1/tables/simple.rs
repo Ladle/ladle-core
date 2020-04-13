@@ -77,6 +77,9 @@ impl TryFrom<CFG> for SimpleTransition {
     }
 }
 
+/// The SimpleTransitionHelper is a struct which holds all of the
+/// data necessary to perform the conversion from a Context Free Grammar
+/// to a set of transition tables that can be used for LR(1) parsing.
 struct SimpleTransitionHelper {
     /// The set of symbols produced by the grammar
     potential_symbols: HashSet<Symbol>,
@@ -128,7 +131,7 @@ impl SimpleTransitionHelper {
         let mut initial_items = BTreeSet::new();
         initial_items.insert(initial_item);
 
-        let initial_stage = expand_stage(Stage { items: initial_items }, &self.productions);
+        let initial_stage = expand_stage(&Stage { items: initial_items }, &self.productions);
 
         self.stages.push(initial_stage.clone());
         self.non_terminal_stages.push(vec![None; self.non_terminal_cols]);
@@ -142,9 +145,8 @@ impl SimpleTransitionHelper {
             let source_stage = self.stages[source_idx].clone();
 
             for next_symbol in self.potential_symbols.iter() {
-                let dest_stage = source_stage.clone();
-                let dest_stage = apply_symbol(dest_stage, *next_symbol);
-                let dest_stage = expand_stage(dest_stage, &self.productions);
+                let applied_stage = apply_symbol(&source_stage, *next_symbol);
+                let dest_stage = expand_stage(&applied_stage, &self.productions);
 
                 let dest_idx = if let Some(existing_idx) = self.known_stages.get(&dest_stage) {
                     *existing_idx
@@ -226,11 +228,56 @@ fn terminal_cols(potential_symbols: &HashSet<Symbol>) -> usize {
     }
 }
 
-fn apply_symbol(_stage: Stage, _symbol: Symbol) -> Stage {
-    unimplemented!()
+fn apply_symbol(stage: &Stage, symbol: Symbol) -> Stage {
+    let mut new_items = BTreeSet::new();
+
+    for item in stage.items.iter() {
+        if let Some(new_item) = apply_symbol_to_item(item, symbol) {
+            new_items.insert(new_item);
+        }
+    }
+
+    Stage { items: new_items }
 }
 
-fn expand_stage(_stage: Stage, _productions: &[ExtendedProduction]) -> Stage {
+fn apply_symbol_to_item(item: &Item, symbol: Symbol) -> Option<Item> {
+    if item.position < item.production.right.len() {
+        let expected_symbol = item.production.right[item.position];
+        if expected_symbol == symbol {
+            let mut new_item = item.clone();
+            new_item.position += 1;
+            Some(new_item)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn expand_stage(stage: &Stage, productions: &[ExtendedProduction]) -> Stage {
+    let mut new_items = BTreeSet::new();
+    let mut item_queue = VecDeque::new();
+
+    for item in stage.items.iter() {
+        item_queue.push_back(item.clone());
+    }
+
+    while let Some(item) = item_queue.pop_front() {
+        for derived_item in derive_items(item, productions).into_iter() {
+            if !new_items.contains(&derived_item) {
+                new_items.insert(derived_item.clone());
+                item_queue.push_back(derived_item);
+            }
+        }
+    }
+
+    Stage {
+        items: new_items
+    }
+}
+
+fn derive_items(_item: Item, _productions: &[ExtendedProduction]) -> Vec<Item> {
     unimplemented!()
 }
 
