@@ -1,6 +1,6 @@
 use std::slice::Iter;
 
-/// A Tree that has values stored at the 
+/// A Tree that has values stored in both its leaves and branches
 pub trait Tree<B, L>: Sized {
     /// Create a new leaf node.
     fn new_leaf(val: L) -> Self;
@@ -14,15 +14,20 @@ pub trait Tree<B, L>: Sized {
     fn leaf_val(&self) -> Option<&L>;
 }
 
-/// A heap allocated tree
+/// A Heap Allocated Tree.
+/// It stores it's children in a vector.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BoxTree<B, L> {
+    /// A branch node of an BoxTree.
+    /// It has a list of children and possesses a branch value.
     Branch {
         /// The value (non-terminal) associated with this branch of the tree
         val: B,
         /// The children of this node
         children: Vec<BoxTree<B, L>>
     },
+    /// A leaf node of an BoxTree.
+    /// It has no children and possesses a leaf value
     Leaf {
         /// The value (terminal) associated with this leaf of the tree
         val: L
@@ -62,18 +67,23 @@ impl<B, L> Tree<B, L> for BoxTree<B, L> {
 
 use std::rc::Rc;
 
-/// A Reference Counted Tree, which can be shared and share
-/// data with other RcTrees
+/// A Reference Counted Tree,
+/// which can be shared and share data with other RcTrees.
+/// It stores it's children in a reference counted vector to achieve this.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RcTree<B, L> {
+    /// A branch node of an RcTree.
+    /// It has a list of children and possesses a branch value.
     Branch {
-        /// The value (non-terminal) associated with this branch of the tree
+        /// The value associated with this branch of the tree.
         val: B,
-        /// The children of this node
+        /// The children of this node.
         children: Rc<Vec<RcTree<B, L>>>
     },
+    /// A leaf node of an RcTree.
+    /// It has no children and possesses a leaf value
     Leaf {
-        /// The value (terminal) associated with this leaf of the tree
+        /// The value associated with this leaf of the tree.
         val: L
     }
 }

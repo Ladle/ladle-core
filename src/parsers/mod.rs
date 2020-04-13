@@ -1,4 +1,6 @@
+/// The LR(1) parser module
 pub mod lr1;
+/// The GLR parser module
 pub mod glr;
 
 /// A Context Free Grammar,
@@ -25,7 +27,9 @@ pub struct CFGProduction {
 /// A symbol, either terminal or non-terminal
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Symbol {
+    /// A terminal symbol
     Terminal { val: Term },
+    /// A non-terminal symbol
     NonTerminal { val: NonTerm }
 }
 

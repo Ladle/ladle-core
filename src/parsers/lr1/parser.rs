@@ -3,14 +3,16 @@ use crate::trees::{ BoxTree, Tree };
 
 use super::tables::{ LRTransition, ParseAction, EndParseAction };
 
-/// 
+/// An LR(1) parser for a singular input.
+/// It contains a reference to an LRTransition,
+/// that it uses to perform the parsing.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LRParser<T> 
+pub struct LRParser<'a, T> 
     where
         T: LRTransition {
 
     /// The Parse action and state transition tables
-    transition: T,
+    transition: &'a T,
 
     /// The terminal indexes for the input string
     input: Vec<Term>,
@@ -25,14 +27,14 @@ pub struct LRParser<T>
     failed: bool
 }
 
-impl<T> LRParser<T>
+impl<'a, T> LRParser<'a, T>
     where
         T: LRTransition {
 
     /// Create an LRParser
     /// with a set of LRTransition that represent the grammar logic
     /// and a list of input terminals to parse
-    pub fn new(transition: T, input: Vec<Term>) -> Self {
+    pub fn new(transition: &'a T, input: Vec<Term>) -> Self {
         LRParser {
             transition,
             input,
@@ -105,7 +107,17 @@ impl<T> LRParser<T>
     }
 
     fn reduce(&mut self, nonterm: NonTerm, nodes: usize) {
+        let mut children = Vec::new();
 
+        for _i in 0..nodes {
+            let tree = self.forest.pop().unwrap();
+            children.push(tree);
+        }
+
+        children.reverse();
+        let new_tree = BoxTree::new_branch(nonterm, children);
+
+        self.forest.push(new_tree);
     }
 
     /// Extract the output from the parser
