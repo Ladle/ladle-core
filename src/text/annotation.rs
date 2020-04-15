@@ -116,7 +116,127 @@ fn make_underline(offset: usize, len: usize) -> String {
             " ".repeat(offset) + "^"
         },
         _ => {
-            " ".repeat(offset) + "^" + &("-".repeat(len - 2)) + "^"
+            " ".repeat(offset) + &("^".repeat(len))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_empty_annotation() {
+        let input = Input::new("1\n12\n123\n1234\n12345\n123456".into());
+        let annotation = AnnotationBuilder::new(&input);
+        assert_eq!("AnnotationBuilder: No Contents to Display", format!("{}", annotation));
+    }
+    
+    #[test]
+    fn test_one_line_annotation() {
+        let input = Input::new("1\n12\n123\n1234\n12345\n123456".into());
+        let mut annotation = AnnotationBuilder::new(&input);
+        annotation.add_line(2);
+
+        let line0 = "   |\n";
+        let line1 = " 2 | 123\n";
+        let line2 = "   |\n";
+        let expected = format!("{}{}{}", line0, line1, line2);
+
+        assert_eq!(expected, format!("{}", annotation));
+    }
+    
+    #[test]
+    fn test_two_line_annotation() {
+        let input = Input::new("1\n12\n123\n1234\n12345\n123456".into());
+        let mut annotation = AnnotationBuilder::new(&input);
+        annotation.add_line(2);
+        annotation.add_line(3);
+
+        let line0 = "   |\n";
+        let line1 = " 2 | 123\n";
+        let line2 = " 3 | 1234\n";
+        let line3 = "   |\n";
+        let expected = format!("{}{}{}{}", line0, line1, line2, line3);
+
+        assert_eq!(expected, format!("{}", annotation));
+    }
+    
+    #[test]
+    fn test_two_line_gap_annotation() {
+        let input = Input::new("1\n12\n123\n1234\n12345\n123456".into());
+        let mut annotation = AnnotationBuilder::new(&input);
+        annotation.add_line(2);
+        annotation.add_line(4);
+
+        let line0 = "   |\n";
+        let line1 = " 2 | 123\n";
+        let line2 = "   | ...\n";
+        let line3 = " 4 | 12345\n";
+        let line4 = "   |\n";
+        let expected = format!("{}{}{}{}{}", line0, line1, line2, line3, line4);
+
+        assert_eq!(expected, format!("{}", annotation));
+    }
+    
+    #[test]
+    fn test_one_line_underlined_annotation() {
+        let input = Input::new("1\n12\n123\n1234\n12345\n123456".into());
+        let mut annotation = AnnotationBuilder::new(&input);
+        let underline = Underline { start: 0, len: 3 };
+        annotation.add_line_underlined(2, underline);
+
+        let line0 = "   |\n";
+        let line1 = " 2 | 123\n";
+        let line2 = "   | ^^^\n";
+        let line3 = "   |\n";
+        let expected = format!("{}{}{}{}", line0, line1, line2, line3);
+
+        assert_eq!(expected, format!("{}", annotation));
+    }
+    
+    #[test]
+    fn test_two_line_underlined_annotation() {
+        let input = Input::new("1\n12\n123\n1234\n12345\n123456".into());
+        let mut annotation = AnnotationBuilder::new(&input);
+
+        let underline1 = Underline { start: 0, len: 3 };
+        annotation.add_line_underlined(2, underline1);
+    
+        let underline2 = Underline { start: 0, len: 4 };
+        annotation.add_line_underlined(3, underline2);
+
+        let line0 = "   |\n";
+        let line1 = " 2 | 123\n";
+        let line2 = "   | ^^^\n";
+        let line3 = " 3 | 1234\n";
+        let line4 = "   | ^^^^\n";
+        let line5 = "   |\n";
+        let expected = format!("{}{}{}{}{}{}", line0, line1, line2, line3, line4, line5);
+
+        assert_eq!(expected, format!("{}", annotation));
+    }
+
+    #[test]
+    fn test_two_line_gap_underlined_annotation() {
+        let input = Input::new("1\n12\n123\n1234\n12345\n123456".into());
+        let mut annotation = AnnotationBuilder::new(&input);
+
+        let underline1 = Underline { start: 0, len: 3 };
+        annotation.add_line_underlined(2, underline1);
+    
+        let underline2 = Underline { start: 0, len: 5 };
+        annotation.add_line_underlined(4, underline2);
+
+        let line0 = "   |\n";
+        let line1 = " 2 | 123\n";
+        let line2 = "   | ^^^\n";
+        let line3 = "   | ...\n";
+        let line4 = " 4 | 12345\n";
+        let line5 = "   | ^^^^^\n";
+        let line6 = "   |\n";
+        let expected = format!("{}{}{}{}{}{}{}", line0, line1, line2, line3, line4, line5, line6);
+
+        assert_eq!(expected, format!("{}", annotation));
     }
 }
