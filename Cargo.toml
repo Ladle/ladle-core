@@ -1,5 +1,5 @@
 [package]
-name = "ladl-core"
+name = "ladle-core"
 version = "0.1.0"
 authors = ["Kyle B <kylebrw@gmail.com>"]
 edition = "2018"
