@@ -55,7 +55,7 @@ impl Input {
         &self.text
     }
 
-    pub fn get_row(&self, row: usize) -> &str {
+    pub fn get_row_slice(&self, row: usize) -> &str {
         let min_index = self.row_start(row);
         let max_index = self.row_end(row);
         &self.text[min_index..max_index]
@@ -86,7 +86,7 @@ impl Input {
         if row == 0 {
             Pos { row, col: text_index }
         } else {
-            let col = text_index - self.row_start(row) + 1;
+            let col = text_index - self.row_start(row);
             Pos { row, col }
         }
     }
@@ -96,11 +96,15 @@ impl Input {
             return 0;
         }
 
-        if text_index < self.newline_table[0] {
+        let overall_low = self.newline_table[0];
+        let overall_high = *self.newline_table.last().unwrap();
+
+        if text_index <= overall_low {
             return 0;
-        }
-        if text_index > *self.newline_table.last().unwrap() {
-            return self.newline_table.len() - 1;
+        } else if text_index > overall_high {
+            return self.newline_table.len();
+        } else if self.newline_table.len() == 2 {
+            return 1;
         }
 
         let mut left = 0;
@@ -108,18 +112,19 @@ impl Input {
 
         while left != right && left + 1 != right {
             let middle = ( left + right ) / 2;
-            let middle_val = self.newline_table[middle];
-            // println!("t={}, l={}, r={}, m={}, nlt[{}]={}", text_index, left, right, middle, middle, middle_val);
+            let middle_low = self.newline_table[middle];
+            let middle_high = self.newline_table[middle + 1];
 
-            if text_index == middle_val {
-                // println!("nlt[{}] == {}", middle, text_index);
-                return middle + 1;
-            } else if middle_val < text_index {
-                // println!("nlt[{}] < {}", middle, text_index);
-                left = middle;
-            } else if middle_val > text_index {
-                // println!("nlt[{}] > {}", middle, text_index);
+            if text_index == middle_low {
+                return middle;
+            }
+
+            if text_index < middle_low {
                 right = middle;
+            } else if text_index > middle_high {
+                left = middle;
+            } else {
+                return middle + 1;
             }
         }
 
@@ -234,8 +239,6 @@ impl<'a, T> fmt::Display for Span<'a, T>
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let lower_pos = self.input.get_pos(self.start);
         let upper_pos = self.input.get_pos(self.stop);
-        println!("lower {:?}", lower_pos);
-        println!("upper {:?}", upper_pos);
 
         use std::cmp::{max, min};
         let margin_width = max(num_dec_digits(lower_pos.row), num_dec_digits(upper_pos.row)) + 1;
@@ -250,17 +253,12 @@ impl<'a, T> fmt::Display for Span<'a, T>
                 lc = lower_pos.col,
                 m = margin)?;
 
-        let row_diff = if upper_pos.col == 0 {
-            upper_pos.row - lower_pos.row - 1
-        } else {
-            upper_pos.row - lower_pos.row
-        };
-        match row_diff {
+        match upper_pos.row - lower_pos.row {
             0 => {
                 write!(f, "{lr:w$} | {line}\n",
                         lr = lower_pos.row,
                         w = margin_width,
-                        line = self.input.get_row(lower_pos.row))?;
+                        line = self.input.get_row_slice(lower_pos.row))?;
             },
 
             1 => {
@@ -269,8 +267,8 @@ impl<'a, T> fmt::Display for Span<'a, T>
                         lr = lower_pos.row,
                         ur = upper_pos.row,
                         w = margin_width,
-                        line = self.input.get_row(lower_pos.row),
-                        continued_line = self.input.get_row(upper_pos.row))?;
+                        line = self.input.get_row_slice(lower_pos.row),
+                        continued_line = self.input.get_row_slice(upper_pos.row))?;
             },
 
             _ => {
@@ -281,8 +279,8 @@ impl<'a, T> fmt::Display for Span<'a, T>
                         ur = upper_pos.row,
                         m = margin,
                         w = margin_width,
-                        line = self.input.get_row(lower_pos.row),
-                        continued_line = self.input.get_row(upper_pos.row))?;
+                        line = self.input.get_row_slice(lower_pos.row),
+                        continued_line = self.input.get_row_slice(upper_pos.row))?;
             }
         };
 
@@ -341,67 +339,51 @@ mod tests {
         assert_eq!(14, input.row_end(3));
         assert_eq!(18, input.row_end(4));
 
-        assert_eq!(String::from("1234"),  input.get_row(0));
-        assert_eq!(String::from("5"),     input.get_row(1));
-        assert_eq!(String::from("6"),     input.get_row(2));
-        assert_eq!(String::from("78901"), input.get_row(3));
-        assert_eq!(String::from("234"),   input.get_row(4));
+        assert_eq!(String::from("1234"),  input.get_row_slice(0));
+        assert_eq!(String::from("5"),     input.get_row_slice(1));
+        assert_eq!(String::from("6"),     input.get_row_slice(2));
+        assert_eq!(String::from("78901"), input.get_row_slice(3));
+        assert_eq!(String::from("234"),   input.get_row_slice(4));
+    }
+
+    #[test]
+    fn newline_indices() {
+        let num_newlines = 100;
+        let input = Input::new("\n".repeat(num_newlines));
+        let newlines: Vec<usize> = (0..num_newlines).collect();
+        assert_eq!(newlines, input.newline_table);
+
+        for i in 0..num_newlines {
+            assert_eq!(i, input.get_row_num(i), "index is {}", i);
+            let expected_pos = Pos { row: i, col: 0 };
+            assert_eq!(expected_pos, input.get_pos(i), "index is {}", i);
+        }
     }
 
     #[test]
     fn index_based_tests() {
         let input = Input::new("a;slajt\nleham\nc.a,mebuais;cmn\nbv,b\ne,mnbt\n".into());
-        assert_eq!(vec![7, 13, 29, 34, 41], input.newline_table);
+        let newlines = vec![7, 13, 29, 34, 41];
+        assert_eq!(newlines, input.newline_table);
 
-        for i in 0..7 {
-            assert_eq!(0, input.get_row_num(i));
-            assert_eq!(Pos { row: 0, col: i }, input.get_pos(i));
-        }
-        for i in 8..13 {
-            assert_eq!(1, input.get_row_num(i));
-            assert_eq!(Pos { row: 1, col: i - 7 }, input.get_pos(i));
-        }
-        for i in 14..29 {
-            assert_eq!(2, input.get_row_num(i));
-            assert_eq!(Pos { row: 2, col: i - 13 }, input.get_pos(i));
-        }
-        for i in 30..34 {
-            assert_eq!(3, input.get_row_num(i));
-            assert_eq!(Pos { row: 3, col: i - 29 }, input.get_pos(i));
-        }
-        for i in 35..41 {
-            assert_eq!(4, input.get_row_num(i));
-            assert_eq!(Pos { row: 4, col: i - 34 }, input.get_pos(i));
+        for i in 0..42 {
+            let expected_row = match i {
+                0..=7 => 0,
+                8..=13 => 1,
+                14..=29 => 2,
+                30..=34 => 3,
+                35..=41 => 4,
+                _ => 10000
+            };
+            assert_eq!(expected_row, input.get_row_num(i), "index is {}", i);
+
+            let expected_col = match expected_row {
+                0 => i,
+                _ => i - newlines[expected_row - 1] - 1
+            };
+            let expected_pos = Pos { row: expected_row, col: expected_col };
+
+            assert_eq!(expected_pos, input.get_pos(i), "index is {}", i);
         }
     }
-
-    #[test]
-    fn a() {
-        let input = Input::new("ASDF\nG\nH\nIJKLM\nNOP".into());
-        assert_eq!(vec![4, 6, 8, 14], input.newline_table);
-
-        for i in 0..4 {
-            assert_eq!(0, input.get_row_num(i));
-            assert_eq!(Pos { row: 0, col: i }, input.get_pos(i));
-        }
-        for i in 5..6 {
-            assert_eq!(1, input.get_row_num(i));
-            assert_eq!(Pos { row: 1, col: i - 5 }, input.get_pos(i), "index is {}", i);
-        }
-        for i in 7..8 {
-            assert_eq!(2, input.get_row_num(i));
-            assert_eq!(Pos { row: 2, col: i - 7 }, input.get_pos(i));
-        }
-        for i in 9..14 {
-            assert_eq!(3, input.get_row_num(i));
-            assert_eq!(Pos { row: 3, col: i - 9 }, input.get_pos(i));
-        }
-        for i in 15..18 {
-            assert_eq!(3, input.get_row_num(i));
-            assert_eq!(Pos { row: 3, col: i - 15 }, input.get_pos(i));
-        }
-        println!("{:?}", input.newline_table);
-        println!("{}", input.get_span(2, 17, "DF-G"));
-    }
-    
 }
