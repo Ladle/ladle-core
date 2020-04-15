@@ -1,6 +1,6 @@
-/// The input module, which contains tools for storing texts
+/// The text module, which contains tools for storing texts
 /// taking spans of them and formatting span information nicely
-pub mod input;
+pub mod text;
 /// The trees module, which contains tree data structures
 pub mod trees;
 /// The parsers module, which contains parser algorithms
